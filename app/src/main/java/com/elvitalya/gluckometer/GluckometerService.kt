@@ -23,6 +23,26 @@ class GlucometerService : Service() {
     val recordAccessControlPointCharacteristicCBUUID by lazy { convertFromInteger(0x2A52) }
 
 
+    // new
+    val bgService = "00001808-0000-1000-8000-00805f9b34fb"
+    val glucoseMeasurementCharacteristic = "00002a18-0000-1000-8000-00805f9b34fb"
+    val bgMeasurement = "00002a18-0000-1000-8000-00805f9b34fb"
+    val clientCharacteristicConfig = "00002902-0000-1000-8000-00805f9b34fb"
+
+    fun setCharacteristicNotification(
+        characteristic: BluetoothGattCharacteristic,
+    ) {
+        bluetoothGatt.setCharacteristicNotification(characteristic, true)
+
+        // This is specific to Glucose Measurement.
+        if (UUID.fromString(bgMeasurement) == characteristic.uuid) {
+            val descriptor =
+                characteristic.getDescriptor(UUID.fromString(clientCharacteristicConfig))
+            descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+            bluetoothGatt.writeDescriptor(descriptor)
+        }
+    }
+
     private val bluetoothGattCallback: BluetoothGattCallback = object : BluetoothGattCallback() {
 
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
@@ -42,9 +62,13 @@ class GlucometerService : Service() {
         override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
             super.onServicesDiscovered(gatt, status)
             Log.d(TAG, "onServicesDiscovered: ")
-            requestReadFirmRevision()
+            val service = gatt.getService(UUID.fromString(bgService))
+            if (service != null) {
+                val glucoseCharacteristic =
+                    service.getCharacteristic(UUID.fromString(glucoseMeasurementCharacteristic))
+                setCharacteristicNotification(glucoseCharacteristic)
+            }
         }
-
 
 
         override fun onCharacteristicRead(
@@ -53,23 +77,7 @@ class GlucometerService : Service() {
             status: Int
         ) {
             super.onCharacteristicRead(gatt, characteristic, status)
-            Log.d(TAG, "onCharacteristicRead: ${characteristic.uuid}")
-
-            val bytes = characteristic.value
-            Log.d(TAG, "onCharacteristicRead: bytes ${bytes.joinToString()}")
-        }
-
-        override fun onCharacteristicWrite(
-            gatt: BluetoothGatt,
-            characteristic: BluetoothGattCharacteristic,
-            status: Int
-        ) {
-            super.onCharacteristicWrite(gatt, characteristic, status)
-
-            val serviceUuidString = characteristic.service.uuid.toString()
-            val characteristicUuidString = characteristic.uuid.toString()
-            Log.d(TAG, "onCharacteristicWrite: serviceUuidString $serviceUuidString")
-            Log.d(TAG, "onCharacteristicWrite: characteristicUuidString $characteristicUuidString")
+            readData(characteristic)
         }
 
         override fun onCharacteristicChanged(
@@ -77,56 +85,23 @@ class GlucometerService : Service() {
             characteristic: BluetoothGattCharacteristic
         ) {
             super.onCharacteristicChanged(gatt, characteristic)
-            Log.d(TAG, "onCharacteristicChanged: ")
-
+            readData(characteristic)
         }
     }
 
-    fun requestReadFirmRevision() {
-        Log.d(TAG, "requestReadFirmRevision: ")
-        val service = bluetoothGatt.getService(glucoseServiceCBUUID)
-        Log.d(TAG, "requestReadFirmRevision: service is not null ${service != null}")
-        val characteristicList = mutableListOf<BluetoothGattCharacteristic>()
-        service?.let { gattSerivce ->
-            gattSerivce.getCharacteristic(glucoseMeasurementCharacteristicCBUUID)?.let {
-                Log.d(
-                    TAG,
-                    "add characteristic  glucoseMeasurementCharacteristicCBUUID.add(${it.uuid})"
-                )
-                characteristicList.add(it)
-            }
-            gattSerivce.getCharacteristic(glucoseServiceCBUUID)?.let {
-                Log.d(TAG, "add characteristic  glucoseServiceCBUUID.add(${it.uuid})")
-                characteristicList.add(it)
-            }
-            gattSerivce.getCharacteristic(glucoseMeasurementContextCharacteristicCBUUID)?.let {
-                Log.d(
-                    TAG,
-                    "add characteristic  glucoseMeasurementContextCharacteristicCBUUID.add(${it.uuid})"
-                )
-                characteristicList.add(it)
-            }
-            gattSerivce.getCharacteristic(glucoseFeatureCharacteristicCBUUID)?.let {
-                Log.d(
-                    TAG,
-                    "add characteristic  glucoseFeatureCharacteristicCBUUID.add(${it.uuid})"
-                )
-                characteristicList.add(it)
-            }
-            gattSerivce.getCharacteristic(recordAccessControlPointCharacteristicCBUUID)?.let {
-                Log.d(
-                    TAG,
-                    "add characteristic  recordAccessControlPointCharacteristicCBUUID.add(${it.uuid})"
-                )
-                characteristicList.add(it)
-            }
-        }
-
-        characteristicList.forEach { characteristic ->
-            try {
-                bluetoothGatt.readCharacteristic(characteristic)
-            } catch (e: Exception) {
-                logError(e)
+    private fun readData(characteristic: BluetoothGattCharacteristic) {
+        if (UUID.fromString(bgMeasurement) == characteristic.uuid) {
+            val gtb = GlucoseReadingRx(characteristic.value)
+            Log.d(TAG, "Result: $gtb")
+            val result = gtb.toStringFormatted()
+            Log.d(TAG, "Result formatted: $result")
+        } else {
+            // For all other profiles, writes the data formatted in HEX.
+            val data = characteristic.value
+            if (data != null && data.isNotEmpty()) {
+                val stringBuilder = StringBuilder(data.size)
+                for (byteChar in data) stringBuilder.append(String.format("%02X ", byteChar))
+                Log.d(TAG, String.format("Received", stringBuilder))
             }
         }
     }
