@@ -5,6 +5,7 @@ import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.ScanCallback
+import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.content.ComponentName
@@ -15,16 +16,17 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
+import android.os.ParcelUuid
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBox
-import androidx.compose.material.icons.filled.Call
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,6 +34,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import com.elvitalya.gluckometer.ui.theme.GluckometerTheme
+import java.util.*
 
 
 @SuppressLint("MissingPermission")
@@ -57,6 +60,7 @@ class MainActivity : ComponentActivity() {
         override fun onServiceDisconnected(name: ComponentName) {
             Log.d(TAG, "onServiceDisconnected: ")
         }
+        @RequiresApi(Build.VERSION_CODES.M)
         override fun onServiceConnected(name: ComponentName, service: IBinder) {
             Log.d(TAG, "onServiceConnected: ")
             (service as GlucometerService.TonometerBinder).service.connectDevice(btDevice)
@@ -86,8 +90,10 @@ class MainActivity : ComponentActivity() {
             override fun onScanResult(callbackType: Int, result: ScanResult?) {
                 super.onScanResult(callbackType, result)
                 try {
+                    Log.d(TAG, "onScanResult: advertiseFlags ${result?.scanRecord?.advertiseFlags}")
                     result?.device?.let { device ->
                         device.name?.let { name ->
+                            Log.d(TAG, "onScanResult: name - $name")
                             if (name.contains(deviceName)) {
                                 btDevice = device
                                 stopScan()
@@ -116,10 +122,11 @@ class MainActivity : ComponentActivity() {
     private fun startScan() {
         val scanSettings =
             ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_BALANCED).build()
+        val filter = ScanFilter.Builder().setServiceUuid(ParcelUuid.fromString("00001808-0000-1000-8000-00805f9b34fb")).build()
         try {
             if (!bluetoothAdapter.isEnabled) bluetoothAdapter.enable()
             bluetoothAdapter.bluetoothLeScanner.startScan(
-                emptyList(),
+                listOf(filter),
                 scanSettings,
                 bleScanCallback
             )

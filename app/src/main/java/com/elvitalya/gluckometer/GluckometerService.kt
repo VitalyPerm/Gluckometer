@@ -77,14 +77,6 @@ class GlucometerService : Service() {
             Log.d(TAG, "Result: $gtb")
             val result = gtb.toStringFormatted()
             Log.d(TAG, "Result formatted: $result")
-        } else {
-            // For all other profiles, writes the data formatted in HEX.
-            val data = characteristic.value
-            if (data != null && data.isNotEmpty()) {
-                val stringBuilder = StringBuilder(data.size)
-                for (byteChar in data) stringBuilder.append(String.format("%02X ", byteChar))
-                Log.d(TAG, String.format("Received", stringBuilder))
-            }
         }
     }
 
