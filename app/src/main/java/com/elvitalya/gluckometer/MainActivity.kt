@@ -23,6 +23,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBox
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -113,9 +114,9 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun startScan() {
+        val scanSettings =
+            ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_BALANCED).build()
         try {
-            val scanSettings =
-                ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_BALANCED).build()
             if (!bluetoothAdapter.isEnabled) bluetoothAdapter.enable()
             bluetoothAdapter.bluetoothLeScanner.startScan(
                 emptyList(),
@@ -177,7 +178,7 @@ fun MainScreen(
                 .align(Alignment.CenterHorizontally)
                 .padding(30.dp)
         ) {
-            Icon(imageVector = Icons.Default.Call, contentDescription = null, modifier = Modifier
+            Icon(imageVector = Icons.Default.AccountBox, contentDescription = null, modifier = Modifier
             .size(70.dp))
         }
     }
